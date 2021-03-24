@@ -26,6 +26,26 @@ app = Flask(__name__)
 sockets = Sockets(app)
 app.debug = True
 
+# used Hazel Campbell's code from https://github.com/uofa-cmput404/cmput404-slides/blob/master/examples/WebSocketsExamples/chat.py
+clients = list()
+
+def send_all(msg):
+    for client in clients:
+        client.put(msg)
+
+def send_all_json(obj):
+    send_all( json.dumps(obj) )     #converts python object to JSON string and then sends to all clients
+
+class Client:
+    def __init__(self):
+        self.queue = queue.Queue()
+
+    def put(self, v):
+        self.queue.put_nowait(v)
+
+    def get(self):
+        return self.queue.get()
+
 class World:
     def __init__(self):
         self.clear()
@@ -33,17 +53,17 @@ class World:
         self.listeners = list()
         
     def add_set_listener(self, listener):
-        self.listeners.append( listener )
+        self.listeners.append(listener)
 
     def update(self, entity, key, value):
         entry = self.space.get(entity,dict())
         entry[key] = value
         self.space[entity] = entry
-        self.update_listeners( entity )
+        self.update_listeners(entity)
 
     def set(self, entity, data):
         self.space[entity] = data
-        self.update_listeners( entity )
+        self.update_listeners(entity)
 
     def update_listeners(self, entity):
         '''update the set listeners'''
@@ -64,24 +84,48 @@ myWorld = World()
 def set_listener( entity, data ):
     ''' do something with the update ! '''
 
-myWorld.add_set_listener( set_listener )
+myWorld.add_set_listener(set_listener)
         
 @app.route('/')
 def hello():
     '''Return something coherent here.. perhaps redirect to /static/index.html '''
-    return None
+    return flask.redirect("/static/index.html", code=302)
 
+# used Hazel Campbell's code from https://github.com/uofa-cmput404/cmput404-slides/blob/master/examples/WebSocketsExamples/chat.py
 def read_ws(ws,client):
     '''A greenlet function that reads from the websocket and updates the world'''
     # XXX: TODO IMPLEMENT ME
-    return None
+    try:
+        while True:
+            message = ws.receive()
+            print("WS RECV: %s" % message)
+            if (message is not None):
+                packet = json.loads(message) #takes JSON string and turns into python dict
+                send_all_json(packet)   #sends JSON string to all clients
+                
+            else:
+                break
+    except:
+        '''Done'''
 
+# used Hazel Campbell's code from https://github.com/uofa-cmput404/cmput404-slides/blob/master/examples/WebSocketsExamples/chat.py
 @sockets.route('/subscribe')
 def subscribe_socket(ws):
     '''Fufill the websocket URL of /subscribe, every update notify the
        websocket and read updates from the websocket '''
     # XXX: TODO IMPLEMENT ME
-    return None
+    client = Client()
+    clients.append(client)
+    g = gevent.spawn(read_ws, ws, client) #creates a new Greenlet object that is scheduled to run read_ws(ws, client)
+    try:
+        while True:
+            message = client.get()
+            ws.send(message)
+    except Exception as e:
+        print ("WS ERR: %s" % e)
+    finally:
+        clients.remove(client)
+        gevent.kill(g)  #kill Greenlet object
 
 
 # I give this to you, this is how you get the raw body/data portion of a post in flask
@@ -99,23 +143,26 @@ def flask_post_json():
 @app.route("/entity/<entity>", methods=['POST','PUT'])
 def update(entity):
     '''update the entities via this interface'''
-    return None
+    data = flask_post_json()
+    for key in data:
+        myWorld.update(entity, key, data[key])
+    return json.dumps(myWorld.get(entity))
 
 @app.route("/world", methods=['POST','GET'])    
 def world():
     '''you should probably return the world here'''
-    return None
+    return json.dumps(myWorld.world())
 
 @app.route("/entity/<entity>")    
 def get_entity(entity):
     '''This is the GET version of the entity interface, return a representation of the entity'''
-    return None
-
+    return json.dumps(myWorld.get(entity))
 
 @app.route("/clear", methods=['POST','GET'])
 def clear():
     '''Clear the world out!'''
-    return None
+    myWorld.clear()
+    return json.dumps(myWorld.world())
 
 
 
