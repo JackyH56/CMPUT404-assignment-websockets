@@ -40,35 +40,9 @@ function debug(str) {
     var debugDiv = document.getElementById('debug');
     debugDiv.innerHTML = "" + str;
 }
-debug("Test");
+// debug("Test");
 
 world = {};
-
-function sendJSONXMLHTTPRequest(url, objects, callback) {
-    var xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = function () {
-        if (xhr.readyState==4) {
-            try {
-                if (xhr.status==200) {
-                    //XXX: parse some JSON from the request!
-                    var jsonResponse = JSON.parse(xhr.responseText)
-                    //XXX: Pass the data to the callback!
-                    callback(jsonResponse)
-                }
-            } 
-            catch(e) {
-                // alert('Error: ' + e.name);
-            }
-        }
-    };
-    //XXX: POST to a URL
-    //XXX: set the mimetype and the accept headers!
-    // Remember to use application/json !
-    // code adapted from https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest/send
-    xhr.open("POST", url, true);
-    xhr.setRequestHeader("Content-Type", "application/json");
-    xhr.send(JSON.stringify(objects))
-}
 
 //XXX: TODO Make this prettier!
 function drawCircle(context,entity) {
@@ -152,7 +126,11 @@ function addEntity(entity, data) {
     world[entity] = data;
     drawNextFrame(); // (but should we?)
     //XXX: Send a XHTML Request that updates the entity you just modified!
-    sendJSONXMLHTTPRequest('/entity/'+entity, data)
+    var entitynumber = entity;
+    // figured out how to https://stackoverflow.com/questions/21708652/use-a-variable-in-json-stringify
+    var obj = {};
+    obj[entity] = data;
+    socket.send(JSON.stringify(obj));
 }
 
 var counter = 0;
@@ -291,12 +269,15 @@ function wsSetup() {
             debug("WebSocket Recv:" + msg.data);
             //XXX: TODO What are you going to do here?   
             var message = JSON.parse(msg.data);
-            addEntity(message)
+            for (key in message) {
+                world[key] = message[key]
+            }
+            drawNextFrame();
                      
         } catch (e) {
             alert("socket on message: " + e);
         }
-    }; 
+    };
 }
 
 wsSetup();

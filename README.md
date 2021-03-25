@@ -59,3 +59,8 @@ Contributors
 * Mark Galloway
 * Abram Hindle
 * Cole Mackenzie
+
+References
+==========
+Used some of Hazel Campbell's code from https://github.com/uofa-cmput404/cmput404-slides/blob/master/examples/WebSocketsExamples/chat.py
+for this assignment
